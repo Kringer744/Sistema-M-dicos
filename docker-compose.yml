@@ -1,5 +1,8 @@
 version: "3.9"
 
+# Modelo simplificado: 1 imagem (api+worker+frontend), Postgres e Redis.
+# Roda local: `docker compose up -d`. Deploy: ver DEPLOY.md.
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -19,47 +22,31 @@ services:
     ports:
       - "6379:6379"
 
-  api:
-    build: ./backend
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       - postgres
       - redis
     environment:
-      APP_MODE: api
+      APP_MODE: both
       DATABASE_URL: postgresql+asyncpg://medico:${POSTGRES_PASSWORD:-trocar}@postgres:5432/sistema_medico
       REDIS_URL: redis://redis:6379/0
       UAZAPI_BASE_URL: ${UAZAPI_BASE_URL}
-      UAZAPI_TOKEN: ${UAZAPI_TOKEN}
+      UAZAPI_ADMIN_TOKEN: ${UAZAPI_ADMIN_TOKEN}
       UAZAPI_INSTANCE: ${UAZAPI_INSTANCE:-clinica}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      SECRETARIA_TELEFONE: ${SECRETARIA_TELEFONE}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
       JWT_SECRET: ${JWT_SECRET}
+      TZ: America/Sao_Paulo
+    volumes:
+      - assinaturas:/data/assinaturas
     ports:
       - "8000:8000"
 
-  worker:
-    build: ./backend
-    restart: unless-stopped
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      APP_MODE: worker
-      DATABASE_URL: postgresql+asyncpg://medico:${POSTGRES_PASSWORD:-trocar}@postgres:5432/sistema_medico
-      REDIS_URL: redis://redis:6379/0
-      UAZAPI_BASE_URL: ${UAZAPI_BASE_URL}
-      UAZAPI_TOKEN: ${UAZAPI_TOKEN}
-      UAZAPI_INSTANCE: ${UAZAPI_INSTANCE:-clinica}
-
-  frontend:
-    build: ./frontend
-    restart: unless-stopped
-    depends_on:
-      - api
-    environment:
-      NEXT_PUBLIC_API_URL: http://api:8000
-    ports:
-      - "3000:3000"
-
 volumes:
   pg_data:
+  assinaturas:

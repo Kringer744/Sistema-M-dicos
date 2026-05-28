@@ -46,7 +46,7 @@ export default function WhatsAppPage() {
     if (typeof window !== "undefined" && !webhookUrl) {
       // Sugere a URL do webhook automaticamente
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
-      setWebhookUrl(`${apiUrl.replace(/\/$/, "")}/webhook`);
+      setWebhookUrl(`${apiUrl.replace(/\/$/, "")}/api/webhook`);
     }
   }, [webhookUrl]);
 

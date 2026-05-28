@@ -1,126 +1,112 @@
-# Deploy — EasyPanel Hostinger
+# Deploy — EasyPanel Hostinger (modelo simplificado)
 
-## Pré-requisitos
-- VPS com EasyPanel já instalado
-- Instância UazAPI rodando com WhatsApp conectado
-- Conta OpenRouter com créditos
-- Domínio apontando pro IP da VPS (ex: `clinica.seudominio.com`)
+**Tudo em 1 App** — o FastAPI serve a API em `/api/*` e o frontend Next.js (static export) em `/`.
+Você só precisa de 3 serviços no EasyPanel:
+
+1. Postgres
+2. Redis
+3. App (esse repo)
 
 ## Passo a passo
 
-### 1. Criar projeto no EasyPanel
-- Novo projeto: `sistema-medico`
-
-### 2. Subir repositório
+### 1. Subir código
 ```bash
-cd "Sistema Médico"
-git init
-git add .
-git commit -m "init"
-git remote add origin git@github.com:seu-user/sistema-medico.git
-git push -u origin main
+git clone https://github.com/Kringer744/Sistema-M-dicos.git
+# (ou usar o repo direto no EasyPanel via OAuth do GitHub)
 ```
 
-### 3. Serviços no EasyPanel
+### 2. Criar projeto no EasyPanel
+- Novo projeto: `sistema-medico` (ou o nome que preferir)
 
-**Postgres** (template oficial)
+### 3. Postgres (template oficial)
 - Database: `sistema_medico`
 - Username: `medico`
 - Senha forte → guardar
 
-**Redis** (template oficial)
+### 4. Redis (template oficial)
 - Sem senha (rede interna)
 
-> ⚠️ **IMPORTANTE** — os Dockerfiles estão em **subpastas** (`backend/` e `frontend/`).
-> No EasyPanel, em cada App, vá em **Source** → preencha o campo **Path** com o subdiretório
-> (`/backend` ou `/frontend`). Sem isso, o build falha com "Dockerfile: no such file or directory".
-
-**API (App)**
-- Source → **Repository**: `Kringer744/Sistema-M-dicos`
-- Source → **Path**: `/backend` ← essencial
-- Source → **Branch**: `main`
-- Build → **Dockerfile**: `Dockerfile` (já dentro de `/backend`)
-- Porta interna: `8000`
-- Variáveis:
+### 5. App principal (Source = GitHub)
+- **Repository**: `Kringer744/Sistema-M-dicos`
+- **Branch**: `main`
+- **Path**: deixar vazio (Dockerfile está na raiz)
+- **Port**: `8000`
+- **Health check**: `/health`
+- **Domínio**: `clinica.seudominio.com`
+- **Variáveis de ambiente**:
   ```
-  APP_MODE=api
-  DATABASE_URL=postgresql+asyncpg://medico:SENHA@$(project_name)_postgres:5432/sistema_medico
-  REDIS_URL=redis://$(project_name)_redis:6379/0
-  UAZAPI_BASE_URL=https://sua-instancia.uazapi.com
-  UAZAPI_TOKEN=...
+  APP_MODE=both
+  DATABASE_URL=postgresql+asyncpg://medico:SENHA@$(PROJECT_NAME)_postgres:5432/sistema_medico
+  REDIS_URL=redis://$(PROJECT_NAME)_redis:6379/0
+  UAZAPI_BASE_URL=https://combustiveldigital.uazapi.com
+  UAZAPI_ADMIN_TOKEN=<seu admin token>
   UAZAPI_INSTANCE=clinica
   OPENROUTER_API_KEY=sk-or-v1-...
   SECRETARIA_TELEFONE=5511999999999
-  WEBHOOK_SECRET=...
-  JWT_SECRET=...
+  WEBHOOK_SECRET=<gere com openssl rand -base64 24>
+  JWT_SECRET=<gere com openssl rand -base64 32>
   TZ=America/Sao_Paulo
   ```
-- Domínio: `api.clinica.seudominio.com`
-- Health check: `/health`
+  > Troque `$(PROJECT_NAME)` pelo nome real do seu projeto no EasyPanel (ex: `proxy_postgres`).
 
-**Worker (App)**
-- Source → **Path**: `/backend` ← essencial (mesmo do API)
-- Source → **Branch**: `main`
-- Sem domínio exposto
-- Variáveis: idem API, **mas** `APP_MODE=worker`
+### 6. Deploy
+Clica em **Deploy**. Ele vai:
+- Buildar o frontend (Next.js static export)
+- Buildar o backend (FastAPI + worker)
+- Rodar migrations (Alembic) na primeira vez
+- Subir api + worker + agendador no mesmo processo (`APP_MODE=both`)
 
-**Frontend (App)**
-- Source → **Repository**: `Kringer744/Sistema-M-dicos`
-- Source → **Path**: `/frontend` ← essencial
-- Source → **Branch**: `main`
-- Build → **Dockerfile**: `Dockerfile` (já dentro de `/frontend`)
-- Porta interna: `3000`
-- Variáveis:
-  ```
-  NEXT_PUBLIC_API_URL=https://api.clinica.seudominio.com
-  ```
-- Domínio: `clinica.seudominio.com`
-
-### Alternativa: Compose direto no EasyPanel
-Se preferir subir tudo de uma vez sem criar 3 Apps separados:
-- No EasyPanel crie um serviço do tipo **Compose**
-- Cole o conteúdo do `docker-compose.yml`
-- Vai subir postgres + redis + api + worker + frontend juntos
-- Defina as variáveis de ambiente do `.env.example` no painel
-
-### 4. Migrations
-Rodam automaticamente no `start.sh` da API/worker (alembic upgrade head).
-
-### 5. Configurar webhook UazAPI
-Agora o painel faz isso pra você:
-- Logar em `https://clinica.seudominio.com/whatsapp`
-- Conectar (escanear QR)
-- Clicar em **Salvar webhook** (a URL `https://api.clinica.seudominio.com/webhook` vem preenchida)
-
-Alternativa manual no painel UazAPI:
-- URL: `https://api.clinica.seudominio.com/webhook`
-- Header customizado: `X-Webhook-Secret: <mesmo do .env>`
-- Eventos: `messages.upsert` (ou equivalente)
-
-### 6. Criar admin
+### 7. Criar admin (primeiro acesso)
 ```bash
-curl -X POST https://api.clinica.seudominio.com/auth/setup \
+curl -X POST https://clinica.seudominio.com/api/auth/setup \
   -H "Content-Type: application/json" \
   -d '{"nome":"Dr Fulano","email":"medico@clinica.com","senha":"senha-forte"}'
 ```
 
-### 7. Configurar agenda
-- Logar no painel: `clinica.seudominio.com/login`
-- Ir em **Config** → ajustar nome do médico, horários, duração, textos de lembrete
+### 8. Conectar WhatsApp
+- Logar em `https://clinica.seudominio.com/login`
+- Menu **WhatsApp** → **Gerar QR code** → escanear no celular
+- Clicar em **Salvar webhook** (URL `https://clinica.seudominio.com/api/webhook` já vem preenchida)
 
-### 8. Tablet da clínica
-- Abrir em modo kiosco: `clinica.seudominio.com/checkin`
-- Rota não exige login (acesso público controlado pela rede da clínica)
+### 9. Configurar agenda
+- Menu **Config** → ajustar nome do médico, horários, duração, cadência de lembretes
 
-## Smoke test pós-deploy
+### 10. Tablet da clínica
+- Abrir em modo kiosco: `https://clinica.seudominio.com/checkin`
+- Rota não exige login
 
-1. `curl https://api.../health` → `{"status":"ok"}`
-2. Criar paciente manual via painel
-3. Marcar agendamento pelo painel → ver secretária receber WhatsApp
-4. Trocar `disparar_em` de um lembrete pra "agora" no DB → conferir disparo em 1 min
-5. Fazer check-in via tablet → ver paciente criado + agendamento + WhatsApp de boas-vindas
+## Rotas
 
-## Monitoramento
+| Path | Atende |
+|---|---|
+| `/` | Frontend (redireciona pra `/login` ou `/agenda`) |
+| `/login`, `/agenda`, `/pacientes`, etc | Frontend Next.js |
+| `/checkin` | Tablet da clínica (kiosco, sem login) |
+| `/api/*` | API FastAPI |
+| `/api/webhook` | Webhook UazAPI |
+| `/health` | Health check (não exige auth) |
 
-- Logs: aba de logs do EasyPanel em cada serviço
-- Métricas: pode adicionar Prometheus/Grafana depois (não inclusos no MVP)
+## Smoke test
+
+1. `curl https://clinica.../health` → `{"status":"ok"}`
+2. Acessar `https://clinica.../` no browser → vai pra `/login`
+3. Setup do admin → entrar no painel
+4. **WhatsApp** → escanear QR
+5. **Pacientes** → **+ Novo paciente** → assinar → agendar
+6. Verificar lembrete no banco: `SELECT * FROM lembretes WHERE status='pendente'`
+
+## Local (dev)
+```bash
+cp .env.example .env
+# edita .env
+docker compose up -d
+# acessa http://localhost:8000
+```
+
+## Alternativa: separar serviços (escala)
+Em produção com tráfego alto vale separar:
+- App `api` (`APP_MODE=api`)
+- App `worker` (`APP_MODE=worker`)
+- App `frontend` separado (Nginx servindo static)
+
+Mas pra o MVP da clínica, 1 App resolve.

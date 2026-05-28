@@ -1,4 +1,6 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Default: mesma origem (frontend servido pelo FastAPI).
+// Em dev local: setar NEXT_PUBLIC_API_URL=http://localhost:8000
+const BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -23,7 +25,9 @@ export async function api<T = unknown>(
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const r = await fetch(`${BASE}${path}`, { ...init, headers });
+  // Todas as chamadas vão pra /api/* (FastAPI serve o frontend na raiz)
+  const url = `${BASE}/api${path.startsWith("/") ? "" : "/"}${path}`;
+  const r = await fetch(url, { ...init, headers });
   if (!r.ok) {
     const erro = await r.text();
     throw new Error(erro || `HTTP ${r.status}`);

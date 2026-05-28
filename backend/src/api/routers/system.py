@@ -8,6 +8,6 @@ async def health():
     return {"status": "ok"}
 
 
-@router.get("/")
-async def root():
+@router.get("/api")
+async def api_info():
     return {"app": "sistema-medico", "version": "0.1.0"}
