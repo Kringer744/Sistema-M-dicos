@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medico
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trocar}
+      POSTGRES_DB: sistema_medico
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      APP_MODE: api
+      DATABASE_URL: postgresql+asyncpg://medico:${POSTGRES_PASSWORD:-trocar}@postgres:5432/sistema_medico
+      REDIS_URL: redis://redis:6379/0
+      UAZAPI_BASE_URL: ${UAZAPI_BASE_URL}
+      UAZAPI_TOKEN: ${UAZAPI_TOKEN}
+      UAZAPI_INSTANCE: ${UAZAPI_INSTANCE:-clinica}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      APP_MODE: worker
+      DATABASE_URL: postgresql+asyncpg://medico:${POSTGRES_PASSWORD:-trocar}@postgres:5432/sistema_medico
+      REDIS_URL: redis://redis:6379/0
+      UAZAPI_BASE_URL: ${UAZAPI_BASE_URL}
+      UAZAPI_TOKEN: ${UAZAPI_TOKEN}
+      UAZAPI_INSTANCE: ${UAZAPI_INSTANCE:-clinica}
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+
+volumes:
+  pg_data:
