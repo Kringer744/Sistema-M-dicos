@@ -31,8 +31,15 @@ git push -u origin main
 **Redis** (template oficial)
 - Sem senha (rede interna)
 
+> ⚠️ **IMPORTANTE** — os Dockerfiles estão em **subpastas** (`backend/` e `frontend/`).
+> No EasyPanel, em cada App, vá em **Source** → preencha o campo **Path** com o subdiretório
+> (`/backend` ou `/frontend`). Sem isso, o build falha com "Dockerfile: no such file or directory".
+
 **API (App)**
-- Build: Dockerfile em `backend/`
+- Source → **Repository**: `Kringer744/Sistema-M-dicos`
+- Source → **Path**: `/backend` ← essencial
+- Source → **Branch**: `main`
+- Build → **Dockerfile**: `Dockerfile` (já dentro de `/backend`)
 - Porta interna: `8000`
 - Variáveis:
   ```
@@ -52,18 +59,29 @@ git push -u origin main
 - Health check: `/health`
 
 **Worker (App)**
-- Mesmo Dockerfile que API
+- Source → **Path**: `/backend` ← essencial (mesmo do API)
+- Source → **Branch**: `main`
 - Sem domínio exposto
 - Variáveis: idem API, **mas** `APP_MODE=worker`
 
 **Frontend (App)**
-- Build: Dockerfile em `frontend/`
+- Source → **Repository**: `Kringer744/Sistema-M-dicos`
+- Source → **Path**: `/frontend` ← essencial
+- Source → **Branch**: `main`
+- Build → **Dockerfile**: `Dockerfile` (já dentro de `/frontend`)
 - Porta interna: `3000`
 - Variáveis:
   ```
   NEXT_PUBLIC_API_URL=https://api.clinica.seudominio.com
   ```
 - Domínio: `clinica.seudominio.com`
+
+### Alternativa: Compose direto no EasyPanel
+Se preferir subir tudo de uma vez sem criar 3 Apps separados:
+- No EasyPanel crie um serviço do tipo **Compose**
+- Cole o conteúdo do `docker-compose.yml`
+- Vai subir postgres + redis + api + worker + frontend juntos
+- Defina as variáveis de ambiente do `.env.example` no painel
 
 ### 4. Migrations
 Rodam automaticamente no `start.sh` da API/worker (alembic upgrade head).
